@@ -56,7 +56,7 @@ $vpk = new VPKArchive($filesystem, 'pak01_dir.vpk');
 $entry = $vpk->get('resource/l4d360ui_english.txt');
 
 // To get a stream:
-$stream = $entry->openStream();
+$stream = $entry->stream();
 
 // To automatically call stream_get_contents:
 $contents = $entry->getData();
