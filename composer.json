@@ -1,0 +1,25 @@
+{
+	"name": "nikkiii/vlib",
+	"description": "PHP Library for Valve data formats and utilities.",
+	"minimum-stability": "dev",
+	"type": "library",
+	"keywords": ["bsp","source engine","vpk","valve formats"],
+	"homepage": "https://github.com/nikkiii/vbsp",
+	"license": "ISC",
+	"authors": [
+		{
+			"name": "Nikki",
+			"email": "nospam@nikkii.us"
+		}
+	],
+	"require": {
+		"php": ">=5.4.0",
+		"rappasoft/laravel-helpers": "dev-master",
+		"league/flysystem": "^1.1@dev"
+	},
+	"autoload": {
+		"psr-4": {
+			"VLib\\": "src/"
+		}
+	}
+}
