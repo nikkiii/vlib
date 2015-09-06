@@ -2,8 +2,11 @@
 
 define('CHUNK_SIZE', 1024);
 
+use VLib\Buffer\Buffer;
 use VLib\Buffer\ByteBuffer;
+use VLib\Buffer\ResourceBuffer;
 use VLib\BSP\Lumps\PakFile;
+use VLib\KeyValues\KeyValues;
 
 class BSPFile {
 	/**
@@ -26,6 +29,12 @@ class BSPFile {
 	 * @var resource
 	 */
 	private $stream;
+
+	/**
+	 * Our ResourceBuffer instance.
+	 * @var ResourceBuffer
+	 */
+	private $buffer;
 
 	/**
 	 * An array of options. Currently only supports lzma path.
@@ -63,24 +72,24 @@ class BSPFile {
 	 */
 	private function readHeader() {
 		// size = 4 (header) + 4 (version) + (64 * 32)
-		$buffer = new ResourceBuffer(fread($this->stream, 8 + (64 * 32)));
+		$this->buffer = new ResourceBuffer($this->stream);
 
-		$header = $buffer->read(4);
+		$header = $this->buffer->read(4);
 
 		if ($header != 'VBSP') {
-			throw new \Exception("Invalid header: $header");
+			throw new BSPException('Invalid header!');
 		}
 
-		$this->version = $buffer->getInteger();
+		$this->version = $this->buffer->getInteger();
 
 		$this->lumpHeader = [];
 
 		for ($i = 0; $i < 64; $i++) {
 			$this->lumpHeader[] = [
-				'fileofs' => $buffer->getInteger(),
-				'filelen' => $buffer->getInteger(),
-				'version' => $buffer->getInteger(),
-				'fourCC' => $buffer->read(4)
+				'fileofs' => $this->buffer->getInteger(),
+				'filelen' => $this->buffer->getInteger(),
+				'version' => $this->buffer->getInteger(),
+				'fourCC' => $this->buffer->read(4)
 			];
 		}
 	}
@@ -94,16 +103,16 @@ class BSPFile {
 	private function readLump($index) {
 		$info = $this->lumpHeader[$index];
 
-		fseek($this->stream, $info['fileofs']);
+		$this->buffer->seek($info['fileofs']);
 
 		if ($index === 0) {
-			$buffer = new ByteBuffer(fread($this->stream, $info['filelen']));
-
-			$hdr = $buffer->peek(4);
+			$hdr = $this->buffer->peek(4);
 
 			if ($hdr == 'LZMA') { // Team Fortress 2
 				// Decompress
-				$buffer = $this->decompressLZMALump($buffer);
+				$buffer = $this->decompressLZMALump($this->buffer);
+			} else {
+				$buffer = $this->buffer->slice($info['filelen']);
 			}
 
 			$parts = explode("}", $buffer->getData());
@@ -123,7 +132,9 @@ class BSPFile {
 
 			$remaining = $info['filelen'];
 			while ($remaining > 0) {
-				$chunk = fread($tmp, $remaining > CHUNK_SIZE ? CHUNK_SIZE : $remaining);
+				$chunk = $this->buffer->read($remaining > CHUNK_SIZE ? CHUNK_SIZE : $remaining);
+
+				fwrite($tmp, $chunk);
 
 				$remaining -= strlen($chunk);
 			}
@@ -140,18 +151,18 @@ class BSPFile {
 	 * @param ByteBuffer $buffer
 	 * @return ByteBuffer
 	 */
-	private function decompressLZMALump(ByteBuffer &$buffer) {
+	private function decompressLZMALump(Buffer $buffer) {
 		$id = $buffer->getInteger();
 		$actualSize = $buffer->getInteger();
 		$lzmaSize = $buffer->getInteger(); // We already know this.
 		$properties = $buffer->read(5);
 
 		if ($id !== 1095588428) { // = (('A'<<24)|('M'<<16)|('Z'<<8)|('L'))
-			throw new \Exception('Lump is not in LZMA format!');
+			throw new BSPException('Lump is not in LZMA format!');
 		}
 
 		if ($lzmaSize > $buffer->remaining()) {
-			throw new \Exception('Not enough data in the buffer');
+			throw new BSPException('Not enough data in the buffer');
 		}
 
 		$descriptorspec = array(
@@ -164,10 +175,12 @@ class BSPFile {
 
 		$proc = proc_open(array_get($this->options, 'lzma_path', static::$lzma_path) . ' d -si -so', $descriptorspec, $pipes);
 
+		$data = $buffer->read($lzmaSize);
+
 		// Valve uses the header to store this info on their own, so we have to append it back on our own.
 		fwrite($pipes[0], $properties);
 		fwrite($pipes[0], $encodedSize);
-		fwrite($pipes[0], $buffer->getData());
+		fwrite($pipes[0], $data);
 		fclose($pipes[0]);
 
 		$buf = '';
@@ -184,7 +197,7 @@ class BSPFile {
 
 		proc_close($proc);
 
-		return new ByteBuffer($buf);
+		return new ByteBuffer($data);
 	}
 
 	/**
