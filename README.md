@@ -38,7 +38,7 @@ $bsp = new BSPFile($fh);
 // $bsp->pakfile = pak file, use openArchive() to get a ZipArchive.
 ```
 
-To open a VPK file:
+To open a VPK file (Uses Flysystem for universal filesystem access):
 
 ```php
 <?php
