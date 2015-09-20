@@ -68,7 +68,7 @@ Using LangWrapper (Ideally you'd load this data from VPKArchive using KeyValues,
 <?php
 require_once 'vendor/autoload.php';
 
-use VLib\LangWrapper;
+use VLib\KeyValues\LangWrapper;
 
 $tokens = [
 	'Something' => 'Blabla'
@@ -83,4 +83,17 @@ $data = [
 $lang = new LangWrapper($tokens, $data);
 
 echo $lang->get('nested.key'); // Blabla
+```
+
+To open a DEM file:
+
+```php
+<?php
+require_once 'vendor/autoload.php';
+
+use VLib\DEM\DEMFile;
+
+$dem = new DEMFile('some_file.dem'); // Either string or resource (open file handle)
+
+// $dem->... contains properties
 ```
